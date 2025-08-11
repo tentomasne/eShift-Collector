@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+
+    table {
+      width: 80%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      background-color: #333;
+    }
+
+    th,
+    td {
+      border: 1px solid white;
+      padding: 10px;
+      text-align: center;
+    }
+
+    button {
+      background-color: #ef4444;
+      color: white;
+      padding: 5px 10px;
+      border: none;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+
+    button:hover {
+      background-color: #dc2626;
+    }
+
+    .container {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin: 2rem;
+    }
+
+    .card {
+      background-color: #2f2f2f;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      min-width: 300px;
+    }
+
+    .card h2 {
+      margin-bottom: 1rem;
+    }
+
+    .card form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: flex-start;
+    }
+
+    label {
+      margin-top: 0.5rem;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="password"],
+    select {
+      padding: 0.3rem;
+      width: 100%;
+      color: black;
+    }
+
+    .btnSubmit {
+      background-color: #2563eb;
+      color: white;
+      padding: 0.5rem 1rem;
+      border: none;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      border-radius: 0.3rem;
+    }
+
+    .btnSubmit:hover {
+      background-color: #1d4ed8;
+    }
+
+    .del-btn {
+      background-color: #ef4444;
+      padding: 0.4rem 0.7rem;
+      border-radius: 0.3rem;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .titleIcon {
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+
+<body>
+  <h1><span class="titleIcon">👑</span> Admin Dashboard <span class="titleIcon">👑</span></h1>
+
+  <!-- LOGIN Container -->
+  <div class="container" id="loginContainer">
+    <div class="card">
+      <h2>🔐 Please Log In</h2>
+      <form id="loginForm">
+        <label>User ID:</label>
+        <input type="number" id="loginUserID" required />
+
+        <label>Special Password:</label>
+        <input type="password" id="loginSpecialPass" required />
+
+        <button type="submit" class="btnSubmit">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN Container for authenticated actions -->
+  <div id="mainContainer" class="hidden">
+    <button onclick="logout()">🚪 Logout</button>
+    <br /><br />
+
+    <button onclick="collectShifts()">🚀 Collect Shifts for Everyone</button>
+
+    <div class="container">
+      <!-- Card for adding a booking -->
+      <div class="card">
+        <h2>📅 Create Booking</h2>
+        <form id="bookingForm">
+          <label>Date:</label>
+          <input type="date" id="date" required />
+
+          <label>Time Slot:</label>
+          <select id="timeSlot">
+            <option value="6:00-9:00">6:00–9:00</option>
+            <option value="10:00-13:00">10:00–13:00</option>
+            <option value="14:00-21:30">14:00+</option>
+          </select>
+
+          <button type="submit" class="btnSubmit">Add Booking</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- All Bookings List -->
+    <h2>My Bookings</h2>
+    <table id="bookingsTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>User ID</th>
+          <th>Date</th>
+          <th>Time Slot</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    // =============== AUTH LOGIC ===============
+    async function doLogin(e) {
+      e.preventDefault();
+      const user_id = document.getElementById("loginUserID").value;
+      const specialpassword = document.getElementById("loginSpecialPass").value;
+
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id, specialpassword })
+      });
+      if (res.ok) {
+        alert("✅ Logged in successfully!");
+        document.getElementById("loginContainer").classList.add("hidden");
+        document.getElementById("mainContainer").classList.remove("hidden");
+        loadBookings();
+      } else {
+        const err = await res.json();
+        alert("❌ Login failed: " + (err.error || "Unknown error"));
+      }
+    }
+
+    async function logout() {
+      const res = await fetch("/logout", { method: "POST" });
+      if (res.ok) {
+        alert("👋 Logged out!");
+        document.getElementById("loginContainer").classList.remove("hidden");
+        document.getElementById("mainContainer").classList.add("hidden");
+      } else {
+        alert("❌ Logout failed.");
+      }
+    }
+
+    // =============== BOOKINGS LOGIC ===============
+    async function loadBookings() {
+      const res = await fetch("/api/bookings");
+      if (!res.ok) {
+        alert("❌ Failed to load bookings. Possibly not logged in?");
+        return;
+      }
+      const data = await res.json();
+      const bookingsTableBody = document.querySelector("#bookingsTable tbody");
+      bookingsTableBody.innerHTML = "";
+
+      data.forEach((booking) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+    <td>${booking.id}</td>
+    <td>${booking.user_id}</td>
+    <td>${booking.date}</td>
+    <td>${booking.timeSlot}</td>
+    <td>${booking.sended ? "✅" : ""}</td>
+    <td>
+      <button class="del-btn" onclick="deleteBooking(${booking.id})">Delete</button>
+    </td>
+  `;
+        bookingsTableBody.appendChild(tr);
+      });
+
+    }
+
+    async function deleteBooking(booking_id) {
+      const res = await fetch(`/api/bookings/${booking_id}`, { method: "DELETE" });
+      if (res.ok) {
+        alert("✅ Booking deleted!");
+        loadBookings();
+      } else {
+        const err = await res.json();
+        alert("❌ Failed to delete booking: " + (err.error || err.message));
+      }
+    }
+
+    document.getElementById("bookingForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const date = document.getElementById("date").value;
+      const timeSlot = document.getElementById("timeSlot").value;
+
+      const res = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date, timeSlot })
+      });
+      if (res.ok) {
+        alert("✅ Booking added!");
+        document.getElementById("bookingForm").reset();
+        loadBookings();
+      } else {
+        const err = await res.json();
+        alert("❌ Failed to add booking: " + (err.error || err.message));
+      }
+    });
+
+    // =============== SHIFT COLLECTION ===============
+    async function collectShifts() {
+      const response = await fetch("/api/collect_shifts", { method: "POST" });
+      if (response.ok) {
+        alert("🚀 SHIFT collection started for all users!");
+      } else {
+        alert("❌ Failed to start SHIFT collection.");
+      }
+    }
+
+    // =============== EVENT LISTENERS & BOOTSTRAP ===============
+    document.getElementById("loginForm").addEventListener("submit", doLogin);
+  </script>
+</body>
+
+</html>
